@@ -1,0 +1,24 @@
+# Environnement & secrets
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Fichiers utilisateurs (jamais versionnés : données potentiellement sensibles)
+storage/uploads/*
+storage/outputs/*
+!storage/uploads/.gitkeep
+!storage/outputs/.gitkeep
+
+# OS / éditeurs
+.DS_Store
+.vscode/
+.idea/
