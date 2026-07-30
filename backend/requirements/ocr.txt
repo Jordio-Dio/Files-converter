@@ -1,0 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+huggingface-hub>=0.20.0,<1.0.0
+python-doctr==0.10.0
