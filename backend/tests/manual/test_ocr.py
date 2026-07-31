@@ -14,6 +14,8 @@ from app.domain.value_objects.page_classification import PageType
 from app.infrastructure.ocr.doctr_extractor import run_ocr_on_pages
 from app.infrastructure.pdf.type_detector import classify_document
 from app.infrastructure.pdf.validator import InvalidPdfError, validate_pdf
+from app.infrastructure.tables.geometric_table_builder import build_tables_from_words
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -52,3 +54,16 @@ if __name__ == "__main__":
               f"confiance moyenne : {r.mean_confidence:.2f} — "
               f"mots peu fiables : {r.low_confidence_word_ratio * 100:.0f}%")
         print(f"   Aperçu texte : {r.text[:200]}...\n")
+
+
+    print("\n--- Reconstruction géométrique de tableau ---\n")
+    for r in results:
+        tables = build_tables_from_words(r.page_number, r.words)
+        if not tables:
+            print(f"Page {r.page_number} : aucun tableau détecté.")
+            continue
+        for i, table in enumerate(tables, start=1):
+            print(f"Page {r.page_number}, tableau {i} : {table.row_count} lignes x "
+                  f"{table.column_count} colonnes")
+            for row in table.rows[:5]:
+                print(f"   {row}")

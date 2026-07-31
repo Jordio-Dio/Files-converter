@@ -13,6 +13,7 @@ from enum import Enum
 class ExtractionMethod(str, Enum):
     CAMELOT_LATTICE = "camelot_lattice"   # tableau avec bordures visibles
     CAMELOT_STREAM = "camelot_stream"     # tableau détecté par alignement (sans bordures)
+    GEOMETRIC_CLUSTERING = "geometric_clustering"
 
 
 @dataclass
