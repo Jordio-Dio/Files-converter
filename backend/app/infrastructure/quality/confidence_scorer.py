@@ -17,7 +17,7 @@ from app.domain.value_objects.confidence_score import TableConfidenceScore
 
 # Seuil EN DESSOUS DUQUEL une cellule individuelle est signalée comme
 # suspecte -- distinct des seuils globaux de routage du pipeline.
-CELL_CONFIDENCE_THRESHOLD = 0.80
+CELL_CONFIDENCE_THRESHOLD = 0.87
 
 NUMERIC_PATTERN = re.compile(r"^[\d\s.,\-]+$")
 

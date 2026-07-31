@@ -33,15 +33,23 @@ def _estimate_line_height(words: list[OcrWord]) -> float:
 
 
 def _group_words_into_rows(words: list[OcrWord], row_tolerance: float) -> list[list[OcrWord]]:
+    """Regroupe les mots par ligne en ancrant chaque comparaison sur le
+    PREMIER mot de la ligne en cours (référence fixe), et non sur une
+    moyenne mobile -- une moyenne mobile dérive progressivement à mesure
+    qu'on ajoute des mots légèrement décalés, jusqu'à finir par avaler le
+    premier mot de la ligne suivante (bug observé : deux lignes de
+    personnes différentes fusionnées avec valeurs dupliquées)."""
     sorted_words = sorted(words, key=lambda w: w.y_center)
     rows: list[list[OcrWord]] = []
+
     for word in sorted_words:
         if rows:
-            row_anchor = sum(w.y_center for w in rows[-1]) / len(rows[-1])
+            row_anchor = rows[-1][0].y_center  # référence FIXE, pas de dérive possible
             if abs(word.y_center - row_anchor) <= row_tolerance:
                 rows[-1].append(word)
                 continue
         rows.append([word])
+
     for row in rows:
         row.sort(key=lambda w: w.x_center)
     return rows
@@ -66,36 +74,59 @@ def _split_into_blocks(
     return blocks
 
 
+# Une bande verticale compte comme "séparateur de colonne" si elle est
+# vide sur au moins cette proportion des lignes du bloc -- au lieu
+# d'exiger qu'elle soit vide sur 100% des lignes (bien trop fragile face
+# à un nom exceptionnellement long qui déborde sur une seule ligne).
+COLUMN_GAP_SUPPORT_RATIO = 0.70
+
+
 def _detect_column_segments(
     rows: list[list[OcrWord]], line_height: float
 ) -> list[tuple[float, float]]:
-    coverage = [False] * COLUMN_GRID_BINS
+    """Détecte les colonnes par consensus de zones vides à travers les
+    lignes du bloc, plutôt que par un simple OU logique (une seule ligne
+    qui déborde ne doit plus pouvoir fusionner deux colonnes à elle seule)."""
+    n_rows = len(rows)
+    if n_rows == 0:
+        return []
+
+    occupied_row_count = [0] * COLUMN_GRID_BINS
 
     for row in rows:
+        row_occupied = [False] * COLUMN_GRID_BINS
         for word in row:
-            # On utilise 50% de la largeur du mot (son cœur) pour éviter
-            # qu'un mot sur-estimé ne bave sur la colonne voisine
-            effective_half_width = max((word.width * 0.5) / 2, 0.001)
-            x_min = max(0.0, word.x_center - effective_half_width)
-            x_max = min(0.999, word.x_center + effective_half_width)
+            half_width = max(word.width * 0.25, 0.002)  # noyau du mot (50% de sa largeur)
+            x_min = max(0.0, word.x_center - half_width)
+            x_max = min(0.999, word.x_center + half_width)
             start_bin = int(x_min * COLUMN_GRID_BINS)
             end_bin = int(x_max * COLUMN_GRID_BINS)
             for b in range(start_bin, end_bin + 1):
                 if 0 <= b < COLUMN_GRID_BINS:
-                    coverage[b] = True
+                    row_occupied[b] = True
+        for b in range(COLUMN_GRID_BINS):
+            if row_occupied[b]:
+                occupied_row_count[b] += 1
 
-    # Seuil dynamique adapté à la taille relative de la ligne
+    # Une bande est un "vrai" séparateur si elle est vide dans au moins
+    # COLUMN_GAP_SUPPORT_RATIO des lignes (consensus), pas dans 100% d'entre elles.
+    is_gap = [
+        (occupied_row_count[b] / n_rows) <= (1 - COLUMN_GAP_SUPPORT_RATIO)
+        for b in range(COLUMN_GRID_BINS)
+    ]
+
     min_gap_bins = max(1, int(line_height * COLUMN_GAP_MIN_RATIO * COLUMN_GRID_BINS))
 
-    merged = coverage[:]
+    # Fusionne les petits trous (espaces intra-cellule, ex. "GILBERT NOEL")
+    # dans les zones occupées -- ne garde que les vrais séparateurs larges.
+    merged = [not g for g in is_gap]  # True = occupé
     i = 0
     while i < COLUMN_GRID_BINS:
         if not merged[i]:
             j = i
             while j < COLUMN_GRID_BINS and not merged[j]:
                 j += 1
-            gap_length = j - i
-            if gap_length < min_gap_bins:
+            if (j - i) < min_gap_bins:
                 for b in range(i, j):
                     merged[b] = True
             i = j
