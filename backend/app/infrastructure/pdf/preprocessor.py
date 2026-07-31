@@ -54,3 +54,24 @@ def pdf_page_to_cv_image(page, zoom: float = 2.0) -> np.ndarray:
     if matrix.n == 4:  # RGBA -> BGR
         return cv2.cvtColor(img_array, cv2.COLOR_RGBA2BGR)
     return cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+def enhance_scan_quality(image: np.ndarray) -> np.ndarray:
+    """Améliore un scan de mauvaise qualité (vieux document, contraste
+    faible, grain) SANS binariser -- docTR est un modèle de deep learning
+    qui reste plus précis sur une image en nuances de gris/couleur qu'en
+    noir et blanc pur (contrairement à Tesseract).
+
+    Deux opérations, dans cet ordre précis (l'ordre compte) :
+    1. Débruitage -- réduit le grain du scan sans flouter le texte.
+    2. CLAHE (contraste adaptatif local) -- renforce le contraste zone par
+       zone, utile sur un scan avec un éclairage inégal (typique d'un vieux
+       document photographié plutôt que scanné à plat).
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    denoised = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(denoised)
+
+    return cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)

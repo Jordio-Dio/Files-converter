@@ -56,14 +56,32 @@ if __name__ == "__main__":
         print(f"   Aperçu texte : {r.text[:200]}...\n")
 
 
-    print("\n--- Reconstruction géométrique de tableau ---\n")
+    from app.infrastructure.quality.cell_corrector import post_process_table
+    from app.infrastructure.quality.confidence_scorer import find_flagged_cells, score_table
+    from app.infrastructure.tables.geometric_table_builder import build_tables_from_words
+
+    print("\n--- Reconstruction + score de confiance ---\n")
     for r in results:
         tables = build_tables_from_words(r.page_number, r.words)
         if not tables:
             print(f"Page {r.page_number} : aucun tableau détecté.")
             continue
+
         for i, table in enumerate(tables, start=1):
+            score = score_table(table)
+            flagged = find_flagged_cells(table)
+            corrected_table, still_flagged = post_process_table(table, flagged)
+
             print(f"Page {r.page_number}, tableau {i} : {table.row_count} lignes x "
                   f"{table.column_count} colonnes")
-            for row in table.rows[:5]:
-                print(f"   {row}")
+            print(f"   Score global : {score.overall_score:.2f} "
+                  f"(fiable={score.is_reliable}, revue LLM={score.needs_llm_review}, "
+                  f"fallback OCR={score.needs_ocr_fallback})")
+            print(f"   Confiance OCR moyenne : {score.mean_word_confidence:.2f}")
+            print(f"   Cellules peu fiables détectées : {len(flagged)}")
+            print(f"   Corrigées automatiquement : {len(flagged) - len(still_flagged)}")
+            print(f"   Toujours suspectes après correction : {len(still_flagged)}")
+            print("   Aperçu (3 premières lignes, après correction) :")
+            for row in corrected_table.rows[:3]:
+                print(f"      {row}")
+            print()

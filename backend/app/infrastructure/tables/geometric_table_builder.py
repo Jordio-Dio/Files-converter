@@ -132,14 +132,28 @@ def _is_table_like(rows: list[list[OcrWord]]) -> bool:
 def _assign_to_segments(row: list[OcrWord], segments: list[tuple[float, float]]) -> list[str]:
     cells = ["" for _ in segments]
     for word in row:
-        # Colonne = segment dont le CENTRE est le plus proche du mot --
-        # robuste même si le mot déborde légèrement sur un segment voisin.
         closest_index = min(
             range(len(segments)),
             key=lambda i: abs(word.x_center - (segments[i][0] + segments[i][1]) / 2),
         )
         cells[closest_index] = f"{cells[closest_index]} {word.text}".strip()
     return cells
+
+
+def _assign_confidences_to_segments(
+    row: list[OcrWord], segments: list[tuple[float, float]]
+) -> list[float]:
+    """Confiance d'une cellule = confiance MINIMALE des mots qui la composent
+    -- un seul mot peu fiable suffit à rendre toute la cellule suspecte
+    (ex. "24715O" avec un seul caractère mal reconnu fausse toute la valeur)."""
+    sums: list[list[float]] = [[] for _ in segments]
+    for word in row:
+        closest_index = min(
+            range(len(segments)),
+            key=lambda i: abs(word.x_center - (segments[i][0] + segments[i][1]) / 2),
+        )
+        sums[closest_index].append(word.confidence)
+    return [min(c) if c else 1.0 for c in sums]
 
 
 def build_tables_from_words(page_number: int, words: list[OcrWord]) -> list[ExtractedTable]:
@@ -163,12 +177,14 @@ def build_tables_from_words(page_number: int, words: list[OcrWord]) -> list[Extr
             continue
 
         table_rows = [_assign_to_segments(row, segments) for row in block_rows]
+        confidence_rows = [_assign_confidences_to_segments(row, segments) for row in block_rows]
         tables.append(
             ExtractedTable(
                 page_number=page_number,
                 rows=table_rows,
                 extraction_method=ExtractionMethod.GEOMETRIC_CLUSTERING,
                 camelot_accuracy=0.0,
+                cell_confidences=confidence_rows,
             )
         )
     return tables

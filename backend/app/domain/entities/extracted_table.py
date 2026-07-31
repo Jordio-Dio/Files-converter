@@ -25,6 +25,9 @@ class ExtractedTable:
     # confiance final du pipeline (celui-ci combinera plusieurs signaux,
     # voir la conception validée à l'étape "score de confiance").
     camelot_accuracy: float = field(default=0.0)
+    # Confiance OCR par cellule (même dimensions que `rows`), None si la
+    # méthode d'extraction ne fournit pas cette info (ex. Camelot).
+    cell_confidences: list[list[float]] | None = field(default=None)
 
     @property
     def row_count(self) -> int:

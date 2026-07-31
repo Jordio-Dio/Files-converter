@@ -12,7 +12,7 @@ from doctr.models import ocr_predictor
 
 from app.core.logging import get_logger
 from app.domain.value_objects.ocr_result import OcrPageResult, OcrWord
-from app.infrastructure.pdf.preprocessor import deskew_image, pdf_page_to_cv_image
+from app.infrastructure.pdf.preprocessor import deskew_image, enhance_scan_quality, pdf_page_to_cv_image
 
 logger = get_logger(__name__)
 
